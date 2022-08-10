@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"target": "ES5",
+        "outDir": "./dist",
+        "allowJs": true,
+		"typeRoots": ["./node_modules/@types", "types"],
+	},
+	"include": [
+		"src/**/*", 
+		"types",
+	],
+	"exclude": ["node_modules"],
+}

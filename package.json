@@ -1,0 +1,27 @@
+{
+  "name": "mtg-web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "source": "src/app.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "parcel",
+    "build": "parcel build"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "magic-card-parser": "^0.3.0",
+    "parcel": "^2.7.0",
+    "typescript": "^4.7.4"
+  },
+  "targets": {
+    "main": false,
+    "modern": {
+      "engines": {
+        "browsers": "Chrome 80"
+      }
+    }
+  }
+}
