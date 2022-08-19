@@ -7,6 +7,27 @@ var result = parseCard({
 
 console.log(result);
 
+interface Cost {
+    costs: any;
+    activatedAbility: any;
+    activate: () => void;
+}
+
+class ActivatedAbility {
+    costs: any;
+    activatedAbility: any;
+    activate = () => {
+        console.log("activate");
+    };
+}
+
+var testText = JSON.stringify(result.result[2][0]);
+console.log(testText);
+var parsed : ActivatedAbility = JSON.parse(testText);
+
+console.log(parsed);
+
+
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
 
