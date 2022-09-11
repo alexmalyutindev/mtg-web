@@ -23,39 +23,97 @@ class ActivatedAbility {
 
 var testText = JSON.stringify(result.result[2][0]);
 console.log(testText);
-var parsed : ActivatedAbility = JSON.parse(testText);
+var parsed: ActivatedAbility = JSON.parse(testText);
 
 console.log(parsed);
 
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const ctx = canvas.getContext("2d");
+const gl = canvas.getContext("webgl2");
+console.log(gl);
 
-var x = 0, y = 0;
-var speed = 2;
-var dx = speed, dy = speed;
-var width = 160, height = 90;
+// Init Geomerty
+const vertices = [
+    -0.5, 0.5, 0.0,
+    -0.5, -0.5, 0.0,
+    0.5, -0.5, 0.0,
+    0.5, 0.5, 0.0
+];
 
-const image = new Image(width, height);
+const indices = [3, 2, 1, 3, 1, 0];
 
-function Update() {
-    ctx.clearRect(0, 0, 900, 600);
+var vertex_buffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-    ctx.drawImage(image, x, y, width, height);
+var index_Buffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_Buffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
-    x += dx;
-    y += dy;
 
-    if (x + width > 900) dx = -speed;
-    if (x < 0) dx = speed;
+var vertCode = `
+    attribute vec3 coordinates;
+    uniform float u_time;
+    void main(void) {
+      gl_Position = vec4(coordinates, 1.0);
+      gl_Position.y += sin(u_time) * 0.1;
+    }`;
+    
+var fragCode = `
+    void main(void) {
+      gl_FragColor = vec4(0.75, 0.3, 0.28, 1.0);
+    }`;
 
-    if (y + height > 600) dy = -speed;
-    if (y < 0) dy = speed;
+var vertShader = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vertShader, vertCode);
+gl.compileShader(vertShader);
+console.log(gl.getShaderInfoLog(vertShader));
 
+var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fragShader, fragCode);
+gl.compileShader(fragShader);
+console.log(gl.getShaderInfoLog(fragShader));
+
+
+var shaderProgram = gl.createProgram();
+gl.attachShader(shaderProgram, vertShader);
+gl.attachShader(shaderProgram, fragShader);
+gl.linkProgram(shaderProgram);
+gl.useProgram(shaderProgram);
+
+
+// const points = new Float32Array(10);
+// const buffer = gl.createBuffer();
+// gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+// gl.bufferData(gl.ARRAY_BUFFER, points, gl.DYNAMIC_DRAW);
+
+const timeLocation = gl.getUniformLocation(shaderProgram, "u_time");
+const coord = gl.getAttribLocation(shaderProgram, "coordinates");
+
+function Render(time: number) {
+    gl.clearColor(1, 1, 1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_Buffer);
+
+    
+    gl.uniform1f(timeLocation, time / 1000.0);
+
+    gl.vertexAttribPointer(coord, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(coord);
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    // gl.drawArraysInstanced(gl.TRIANGLES, 0, indices.length, 10);
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+}
+
+function Update(time) {
+    Render(time);
     requestAnimationFrame(Update);
 }
 
-image.onload = () => {    
-    requestAnimationFrame(Update);
-}
-image.src = "https://www.freepnglogos.com/uploads/dvd-png/tweaking-allm-the-difference-between-blu-ray-and-dvd-30.png";
+requestAnimationFrame(Update);
