@@ -5,8 +5,7 @@
   "main": "dist/app.js",
   "source": "src/app.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "parcel",
+    "dev": "parcel",
     "build": "parcel build"
   },
   "author": "",
@@ -14,6 +13,7 @@
   "dependencies": {
     "magic-card-parser": "^0.3.0",
     "parcel": "^2.7.0",
+    "rollup": "^3.2.3",
     "typescript": "^4.7.4"
   },
   "targets": {

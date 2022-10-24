@@ -1,13 +1,23 @@
 {
+	"source": "src/app.ts",
 	"compilerOptions": {
-		"target": "ES5",
-        "outDir": "./dist",
-        "allowJs": true,
-		"typeRoots": ["./node_modules/@types", "types"],
+		"module": "es2022",
+		"target": "es2022",
+		"lib": [
+			"es2022",
+			"DOM"
+		],
+		"outDir": "dist",
+		"typeRoots": [
+			"node_modules/@types",
+			"types"
+		]
 	},
 	"include": [
-		"src/**/*", 
+		"src/**/*",
 		"types",
 	],
-	"exclude": ["node_modules"],
+	"exclude": [
+		"node_modules"
+	]
 }
