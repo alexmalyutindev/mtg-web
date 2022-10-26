@@ -1,5 +1,6 @@
 import { parseCard } from "magic-card-parser";
-import { Mesh } from "./mesh";
+import { Mesh } from "./Mesh";
+import { Input } from "./InputSystem";
 
 var result = parseCard({
     name: "Thraben Doomsayer",
@@ -83,6 +84,7 @@ function CreateShader(gl: WebGL2RenderingContext): WebGLProgram {
     const vertCode = `
     uniform float u_Time;
     uniform mat4 u_ObjectToWorld;
+    uniform mat4 u_WorldToView;
     uniform mat4 u_Projection;
 
     attribute vec3 a_PositionOS;
@@ -93,35 +95,52 @@ function CreateShader(gl: WebGL2RenderingContext): WebGLProgram {
     void main(void) {
         v_Texcoord = a_Texcoord;
         vec3 positionWS = (u_ObjectToWorld * vec4(a_PositionOS, 1.0)).xyz;
-        vec4 posiotionCS = u_Projection * vec4(positionWS, 1.0);
-        gl_Position = posiotionCS; // vec4(positionWS, 1.0); // 
+        vec3 positionVS = (u_WorldToView * vec4(positionWS, 1.0)).xyz;
+
+        vec4 posiotionCS = u_Projection * vec4(positionVS, 1.0);
+        gl_Position = posiotionCS;
     }`;
 
     const fragCode = `
-    varying highp vec2 v_Texcoord;
+    precision mediump float;
+    varying mediump vec2 v_Texcoord;
 
     uniform sampler2D u_MainTex;
 
+    float checkers(in vec2 p)
+    {
+        vec2 s = sign(fract(p*.5)-.5);
+        return .5 - .5*s.x*s.y;
+    }
+
     void main(void) {
-        gl_FragColor = texture2D(u_MainTex, v_Texcoord);
+        float checker = checkers(v_Texcoord.xy * 5.0);
+        gl_FragColor = mix(vec4(.2, .2, .2, 1.0), vec4(.9, .9, .9, 1.0), checker); 
+        // Texture2D(u_MainTex, v_Texcoord);
     }`;
 
+    var error;
     var vertShader = gl.createShader(gl.VERTEX_SHADER)!;
     gl.shaderSource(vertShader, vertCode);
     gl.compileShader(vertShader);
-    console.log(gl.getShaderInfoLog(vertShader));
+
+    error = gl.getShaderInfoLog(vertShader);
+    if (error) console.log(error);
 
     var fragShader = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(fragShader, fragCode);
     gl.compileShader(fragShader);
-    console.log(gl.getShaderInfoLog(fragShader));
 
+    error = gl.getShaderInfoLog(fragShader)
+    if (error) console.log(error);
 
     var shaderProgram = gl.createProgram()!;
     gl.attachShader(shaderProgram, vertShader);
     gl.attachShader(shaderProgram, fragShader);
     gl.linkProgram(shaderProgram);
-    console.log(gl.getProgramInfoLog(shaderProgram));
+
+    error = gl.getProgramInfoLog(shaderProgram);
+    if (error) console.log(error);
 
     return shaderProgram;
 }
@@ -132,16 +151,75 @@ console.log(gl);
 
 const far = 25;
 const near = 0.01;
-const f = 1.0 / Math.tan(Math.PI * 0.5); // 1.047 <- 60grad
+const f = Math.tan(Math.PI * 0.5 - 0.5 * 1.047); // 1.047 <- 60grad
 const aspect = canvas.width / canvas.height;
 const rangeInv = 1.0 / (near - far);
 
+// function ProjectionMat(fov, aspect) {
+//     const f = 1.0 / Math.tan(fov / 2);
+//     const rangeInv = 1 / (near - far);
+
+//     return [
+//         f / aspect, 0, 0, 0,
+//         0, f, 0, 0,
+//         0, 0, (near + far) * rangeInv, -1,
+//         0, 0, near * far * rangeInv * 2, 0
+//     ];
+// }
+
 const projection = new Float32Array([
-    f / aspect, 0,                         0,  0,
-    0,          f,                         0,  0,
-    0,          0,   (near + far) * rangeInv, -1,
-    0,          0, 2 * near * far * rangeInv,  0
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (near + far) * rangeInv, -1,
+    0, 0, 2 * near * far * rangeInv, 0
 ]);
+
+var x = 0, y = 0, z = 0;
+var h = 1, w = 1, d = 1;
+const objectToWorld = new Float32Array([
+    h, 0, 0, x,
+    0, w, 0, y,
+    0, 0, d, z,
+    0, 0, 0, 1,
+]);
+
+var cos = 0; // cos(PI)
+var sin = 1; // cos(PI)
+y = -0.5;
+const objectToWorld_2 = new Float32Array([
+    5, 0, 0, x,
+    0, 5 * cos, -5 * sin, y,
+    0, 5 * sin, 5 * cos, z,
+    0, 0, 0, 1,
+]);
+
+cos = -1; // cos(PI)
+sin = 0; // cos(PI)
+const worldToView = new Float32Array([
+    cos, 0, sin, 0,
+    0, 1, 0, 0,
+    -sin, 0, cos, -5,
+    0, 0, 0, 1,
+]);
+
+document.getElementById("fov").addEventListener("input", function (e) {
+    var f = Math.tan(Math.PI * 0.5 - 0.5 * this.value * Math.PI);
+    projection[0] = f / aspect;
+    projection[5] = f;
+});
+
+const TRANSLATION_X = 3, TRANSLATION_Y = 7, TRANSLATION_Z = 11;
+document.getElementById("x").addEventListener("input", function (e) {
+    objectToWorld[TRANSLATION_X] = +(e.target as HTMLInputElement).value;
+});
+document.getElementById("y").addEventListener("input", function (e) {
+    objectToWorld[TRANSLATION_Y] = +(event.target as HTMLInputElement).value;
+});
+document.getElementById("z").addEventListener("input", function (e) {
+    objectToWorld[TRANSLATION_Z] = +(event.target as HTMLInputElement).value;
+});
+
+Input.Init(window);
 
 async function Main() {
     const quad = Mesh.Quad();
@@ -150,6 +228,7 @@ async function Main() {
     var shaderProgram = CreateShader(gl);
 
     const u_ObjectToWorld = gl.getUniformLocation(shaderProgram, "u_ObjectToWorld");
+    const u_WorldToView = gl.getUniformLocation(shaderProgram, "u_WorldToView");
     const u_Projection = gl.getUniformLocation(shaderProgram, "u_Projection");
 
     const u_Time = gl.getUniformLocation(shaderProgram, "u_Time");
@@ -162,30 +241,11 @@ async function Main() {
     // var cardInfo = await response.json();
     // var texture = loadTexture(gl, cardInfo['image_uris']['small']);
 
-    const x = 0, y = 0, z = 0;
-    const objectToWorld = new Float32Array([
-        1, 0, 0, x,
-        0, 1, 0, y,
-        0, 0, 1, z,
-        0, 0, 0, 1,
-    ]);
-
-
-    document.getElementById("x").addEventListener("change", function () {
-        objectToWorld[3] = this.value;
-        console.log(objectToWorld);
-    });
-    document.getElementById("y").addEventListener("change", function () {
-        objectToWorld[7] = this.value;
-    });
-    document.getElementById("z").addEventListener("change", function () {
-        objectToWorld[11] = this.value;
-    });
-
     console.log(projection);
 
     function Render(time: number) {
         gl.disable(gl.CULL_FACE);
+        gl.enable(gl.DEPTH_TEST);
 
         gl.clearColor(1, 1, 1, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -194,7 +254,8 @@ async function Main() {
 
         // Global
         gl.uniformMatrix4fv(u_ObjectToWorld, true, objectToWorld);
-        gl.uniformMatrix4fv(u_Projection,    true,    projection);
+        gl.uniformMatrix4fv(u_WorldToView, true, worldToView);
+        gl.uniformMatrix4fv(u_Projection, false, projection);
         gl.uniform1f(u_Time, time / 1000.0);
 
         // Bind mesh
@@ -214,14 +275,31 @@ async function Main() {
         gl.viewport(0, 0, canvas.width, canvas.height);
 
         gl.drawElements(gl.TRIANGLES, quad.indices.length, gl.UNSIGNED_SHORT, 0);
+
+        gl.uniformMatrix4fv(u_ObjectToWorld, true, objectToWorld_2);
+
+        gl.drawElements(gl.TRIANGLES, quad.indices.length, gl.UNSIGNED_SHORT, 0);
     }
 
     function Update(time: number) {
+        Time.time = time;
+        Time.deltaTime = (time - Time.lastUpdateTime) * 0.001;
+        Time.lastUpdateTime = time;
+
+        worldToView[TRANSLATION_X] -= Input.axis.x * Time.deltaTime;
+        worldToView[TRANSLATION_Z] += Input.axis.y * Time.deltaTime;
+
         Render(time);
         requestAnimationFrame(Update);
     }
 
     requestAnimationFrame(Update);
+}
+
+export class Time {
+    static time: number = 0;
+    static deltaTime: number = 0.01;
+    static lastUpdateTime: number = 0;
 }
 
 Main();
