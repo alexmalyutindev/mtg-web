@@ -1,12 +1,5 @@
-export class Vector2 {
-    x : number;
-    y : number;
+import { Vector2 } from "./Vector";
 
-    constructor(x : number, y : number){
-        this.x = x;
-        this.y = y;
-    }
-}
 
 export class Input {
 	static keyboard: Map<string, boolean>;

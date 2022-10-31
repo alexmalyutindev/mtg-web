@@ -1,84 +1,6 @@
-import { parseCard } from "magic-card-parser";
 import { Mesh } from "./Mesh";
 import { Input } from "./InputSystem";
-
-var result = parseCard({
-    name: "Thraben Doomsayer",
-    oracle_text: "{T}: create a 1/1 white Human creature token.\nFateful hour — as long as you have 5 or less life, other creatures you control get +2/+2."
-});
-
-console.log(result);
-
-interface Cost {
-    costs: any;
-    activatedAbility: any;
-    activate: () => void;
-}
-
-class ActivatedAbility {
-    costs: any;
-    activatedAbility: any;
-    activate = () => {
-        console.log("activate");
-    };
-}
-
-var testText = JSON.stringify(result.result[2][0]);
-console.log(testText);
-var parsed: ActivatedAbility = JSON.parse(testText);
-
-console.log(parsed);
-
-
-function loadTexture(gl: WebGL2RenderingContext, url: string): WebGLTexture {
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    // Because images have to be downloaded over the internet
-    // they might take a moment until they are ready.
-    // Until then put a single pixel in the texture so we can
-    // use it immediately. When the image has finished downloading
-    // we'll update the texture with the contents of the image.
-    const level = 0;
-    const internalFormat = gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
-    const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-        width, height, border, srcFormat, srcType,
-        pixel);
-
-    const image = new Image();
-    image.crossOrigin = "";
-    image.onload = () => {
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
-
-        // WebGL1 has different requirements for power of 2 images
-        // vs non power of 2 images so check if the image is a
-        // power of 2 in both dimensions.
-        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
-            // Yes, it's a power of 2. Generate mips.
-            gl.generateMipmap(gl.TEXTURE_2D);
-        } else {
-            // No, it's not a power of 2. Turn off mips and set
-            // wrapping to clamp to edge
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        }
-    };
-    image.src = url;
-
-    return texture!;
-}
-
-function isPowerOf2(value: number) {
-    return (value & (value - 1)) === 0;
-}
+import { Scene } from "./Scene";
 
 function CreateShader(gl: WebGL2RenderingContext): WebGLProgram {
     const vertCode = `
@@ -195,7 +117,7 @@ const objectToWorld_2 = new Float32Array([
 
 cos = -1; // cos(PI)
 sin = 0; // cos(PI)
-const worldToView = new Float32Array([
+let worldToView = new Float32Array([
     cos, 0, sin, 0,
     0, 1, 0, 0,
     -sin, 0, cos, -5,
@@ -203,25 +125,37 @@ const worldToView = new Float32Array([
 ]);
 
 document.getElementById("fov").addEventListener("input", function (e) {
-    var f = Math.tan(Math.PI * 0.5 - 0.5 * this.value * Math.PI);
+    var f = Math.tan(Math.PI * 0.5 - 0.5 * +(e.target as HTMLInputElement).value * Math.PI);
     projection[0] = f / aspect;
     projection[5] = f;
 });
 
-const TRANSLATION_X = 3, TRANSLATION_Y = 7, TRANSLATION_Z = 11;
+const TRANSLATION_X = 12, TRANSLATION_Y = 13, TRANSLATION_Z = 14;
 document.getElementById("x").addEventListener("input", function (e) {
     objectToWorld[TRANSLATION_X] = +(e.target as HTMLInputElement).value;
 });
 document.getElementById("y").addEventListener("input", function (e) {
-    objectToWorld[TRANSLATION_Y] = +(event.target as HTMLInputElement).value;
+    objectToWorld[TRANSLATION_Y] = +(e.target as HTMLInputElement).value;
 });
 document.getElementById("z").addEventListener("input", function (e) {
-    objectToWorld[TRANSLATION_Z] = +(event.target as HTMLInputElement).value;
+    objectToWorld[TRANSLATION_Z] = +(e.target as HTMLInputElement).value;
 });
 
 Input.Init(window);
 
+
 async function Main() {
+    let request = await fetch("../resources/scene.json");
+    let json = await request.json();
+    const scene: Scene = new Scene().deserialize(json); 
+    
+    // await (await fetch("../resources/scene.json")).json();
+    console.log(scene);
+
+    worldToView = scene.root.find(a => a.type == "camera").transform;
+
+    // return;
+
     const quad = Mesh.Quad();
     quad.Init(gl);
 
@@ -237,13 +171,7 @@ async function Main() {
     const a_Texcoord = gl.getAttribLocation(shaderProgram, "a_Texcoord");
     const a_PositionOS = gl.getAttribLocation(shaderProgram, "a_PositionOS");
 
-    // const response = await fetch("https://api.scryfall.com/cards/random");
-    // var cardInfo = await response.json();
-    // var texture = loadTexture(gl, cardInfo['image_uris']['small']);
-
-    console.log(projection);
-
-    function Render(time: number) {
+    function Render() {
         gl.disable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
 
@@ -253,10 +181,10 @@ async function Main() {
         gl.useProgram(shaderProgram);
 
         // Global
-        gl.uniformMatrix4fv(u_ObjectToWorld, true, objectToWorld);
-        gl.uniformMatrix4fv(u_WorldToView, true, worldToView);
+        // gl.uniformMatrix4fv(u_ObjectToWorld, true, objectToWorld);
+        gl.uniformMatrix4fv(u_WorldToView, false, worldToView);
         gl.uniformMatrix4fv(u_Projection, false, projection);
-        gl.uniform1f(u_Time, time / 1000.0);
+        gl.uniform1f(u_Time, Time.time / 1000.0);
 
         // Bind mesh
         gl.enableVertexAttribArray(a_PositionOS);
@@ -274,26 +202,45 @@ async function Main() {
 
         gl.viewport(0, 0, canvas.width, canvas.height);
 
-        gl.drawElements(gl.TRIANGLES, quad.indices.length, gl.UNSIGNED_SHORT, 0);
+        for (let i = 0; i < scene.root.length; i++) {
+            let entity = scene.root[i];
 
-        gl.uniformMatrix4fv(u_ObjectToWorld, true, objectToWorld_2);
+            if (entity.type == 'test_quad') {
+                entity.UpdateMatrix();
 
-        gl.drawElements(gl.TRIANGLES, quad.indices.length, gl.UNSIGNED_SHORT, 0);
+                gl.uniformMatrix4fv(u_ObjectToWorld, true, entity.transform);
+                gl.drawElements(gl.TRIANGLES, quad.indices.length, gl.UNSIGNED_SHORT, 0);
+            }
+        }
     }
 
-    function Update(time: number) {
+    function UpdateTime(time: number) {
         Time.time = time;
         Time.deltaTime = (time - Time.lastUpdateTime) * 0.001;
         Time.lastUpdateTime = time;
-
-        worldToView[TRANSLATION_X] -= Input.axis.x * Time.deltaTime;
-        worldToView[TRANSLATION_Z] += Input.axis.y * Time.deltaTime;
-
-        Render(time);
-        requestAnimationFrame(Update);
     }
 
-    requestAnimationFrame(Update);
+    function UpdateInput() {
+        worldToView[TRANSLATION_X] -= Input.axis.x * Time.deltaTime;
+        worldToView[TRANSLATION_Z] += Input.axis.y * Time.deltaTime;
+    }
+
+    function MainLoop(time: number) {
+        UpdateTime(time);
+        UpdateInput();
+        Render();
+    }
+
+    function A(time: number) {
+        MainLoop(time);
+        requestAnimationFrame(B);
+    }
+    function B(time: number) {
+        MainLoop(time);
+        requestAnimationFrame(A);
+    }
+
+    requestAnimationFrame(A);
 }
 
 export class Time {
